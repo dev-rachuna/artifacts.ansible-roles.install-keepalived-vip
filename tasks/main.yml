@@ -32,14 +32,16 @@
       {{
         (groups[peers_group] | default([]))
         if (peers_group | length) > 0
-        else (play_hosts | default([]))
+        else (ansible_play_batch | default([]))
       }}
     unicast_peers: >-
       {{
         (unicast.peers | default([])) if ((unicast.peers | default([])) | length) > 0 else
         (
           (source_hosts | difference([inventory_hostname]))
-          | map('extract', hostvars, 'ansible_default_ipv4')
+          | map('extract', hostvars, 'ansible_facts')
+          | select('defined')
+          | map(attribute='default_ipv4')
           | select('defined')
           | map(attribute='address')
           | select('defined')
@@ -83,7 +85,7 @@
 
 - name: "Enable and start keepalived (systemd)"
   when:
-    - ansible_service_mgr | default('') == 'systemd'
+    - ansible_facts.service_mgr | default('') == 'systemd'
   ansible.builtin.systemd:
     name: "{{ var_keepalived_service_name }}"
     enabled: true
@@ -92,6 +94,9 @@
 
 - name: "Skip service management (no systemd)"
   when:
-    - ansible_service_mgr | default('') != 'systemd'
+    - ansible_facts.service_mgr | default('') != 'systemd'
   ansible.builtin.debug:
-    msg: "keepalived-vip: keepalived installed/configured, but ansible_service_mgr={{ ansible_service_mgr }} (skip enable/start)"
+    msg: >-
+      keepalived-vip: keepalived installed/configured, but
+      ansible_facts.service_mgr={{ ansible_facts.service_mgr | default('unknown') }}
+      (skip enable/start)

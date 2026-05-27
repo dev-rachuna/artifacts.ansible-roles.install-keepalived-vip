@@ -40,7 +40,7 @@ vrrp_instance {{ inst.name }} {
 {% if unicast.enabled | default(false) | bool %}
 {% set unicast_peers = _keepalived_unicast_peers[inst.name] | default([]) %}
 {% if (unicast_peers | length) > 0 %}
-{% set unicast_src_ip = unicast.src_ip | default(ansible_default_ipv4.address | default('')) %}
+{% set unicast_src_ip = unicast.src_ip | default((ansible_facts.default_ipv4 | default({})).address | default('')) %}
 {% if (unicast_src_ip | default('')) | length > 0 %}
   unicast_src_ip {{ unicast_src_ip }}
 {% endif %}
