@@ -1,0 +1,5 @@
+---
+var_keepalived_service_name: keepalived
+var_keepalived_config_path: /etc/keepalived/keepalived.conf
+var_keepalived_bin: /usr/sbin/keepalived
+var_keepalived_validate_cmd: "{{ var_keepalived_bin }} -t -f %s"

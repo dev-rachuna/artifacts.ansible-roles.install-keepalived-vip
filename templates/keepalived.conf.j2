@@ -1,0 +1,91 @@
+{% set global_defs = (in_keepalived.global_defs | default({})) %}
+
+global_defs {
+  router_id {{ global_defs.router_id | default(inventory_hostname) }}
+{% if (in_keepalived.vrrp_scripts | default([])) | length > 0 %}
+  enable_script_security
+{% endif %}
+}
+
+{% for script in (in_keepalived.vrrp_scripts | default([])) %}
+vrrp_script {{ script.name }} {
+  script "{{ script.script }}"
+  interval {{ script.interval | default(2) }}
+  user {{ script.user | default('keepalived_script') }}
+{% if script.weight is defined %}
+  weight {{ script.weight }}
+{% endif %}
+{% if script.fall is defined %}
+  fall {{ script.fall }}
+{% endif %}
+{% if script.rise is defined %}
+  rise {{ script.rise }}
+{% endif %}
+}
+
+{% endfor %}
+{% for inst in (in_keepalived.instances | default([])) %}
+vrrp_instance {{ inst.name }} {
+  state {{ inst.state | default('BACKUP') }}
+  interface {{ inst.interface }}
+  virtual_router_id {{ inst.virtual_router_id }}
+  priority {{ inst.priority }}
+  advert_int {{ inst.advert_int | default(1) }}
+
+{% if inst.nopreempt | default(false) | bool %}
+  nopreempt
+{% endif %}
+
+{% set unicast = inst.unicast | default({}) %}
+{% if unicast.enabled | default(false) | bool %}
+{% set unicast_peers = _keepalived_unicast_peers[inst.name] | default([]) %}
+{% if (unicast_peers | length) > 0 %}
+{% set unicast_src_ip = unicast.src_ip | default(ansible_default_ipv4.address | default('')) %}
+{% if (unicast_src_ip | default('')) | length > 0 %}
+  unicast_src_ip {{ unicast_src_ip }}
+{% endif %}
+  unicast_peer {
+{% for peer in unicast_peers %}
+    {{ peer }}
+{% endfor %}
+  }
+{% endif %}
+{% endif %}
+
+{% if inst.authentication is defined %}
+  authentication {
+    auth_type {{ inst.authentication.auth_type | default('PASS') }}
+    auth_pass {{ inst.authentication.auth_pass }}
+  }
+{% endif %}
+
+{% if inst.track_interface is defined %}
+  track_interface {
+{% for iface in inst.track_interface %}
+    {{ iface }}
+{% endfor %}
+  }
+{% endif %}
+
+{% if inst.track_script is defined %}
+  track_script {
+{% for script in inst.track_script %}
+    {{ script }}
+{% endfor %}
+  }
+{% endif %}
+
+  virtual_ipaddress {
+{% for vip in inst.virtual_ipaddresses | default([]) %}
+    {{ vip }}
+{% endfor %}
+  }
+
+{% if (inst.extra_lines | default([]) | length) > 0 %}
+{% for line in inst.extra_lines %}
+  {{ line }}
+{% endfor %}
+{% endif %}
+}
+
+{% endfor %}

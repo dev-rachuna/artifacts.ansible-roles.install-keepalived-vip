@@ -1,0 +1,31 @@
+---
+in_keepalived:
+  validate_config: true
+  global_defs:
+    router_id: "{{ inventory_hostname }}"
+  vrrp_scripts:
+    - name: chk_vault
+      script: "/usr/bin/curl -sf --max-time 3 https://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedcode=503 -k -o /dev/null"
+      interval: 5
+      weight: -30
+      fall: 3
+      rise: 2
+  instances:
+    - name: VAULT_VIP
+      interface: eth0
+      virtual_router_id: 53
+      priority: "{{ keepalived_priority | default(100) }}"
+      advert_int: 1
+      nopreempt: true
+      unicast:
+        enabled: true
+      authentication:
+        auth_type: PASS
+        auth_pass: >
+          {{
+            lookup('community.hashi_vault.vault_kv2_get', 'infrastructure/vault-rachuna-net/ansible', engine_mount_point='pl.rachuna-net')['secret']['vip_authentication_pass']
+          }}
+      track_script:
+        - chk_vault
+      virtual_ipaddresses:
+        - 10.3.1.253/24

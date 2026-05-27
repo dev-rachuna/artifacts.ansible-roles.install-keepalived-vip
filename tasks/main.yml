@@ -1,0 +1,97 @@
+---
+- name: "Install keepalived"
+  ansible.builtin.package:
+    name: keepalived
+    state: present
+
+- name: "Ensure keepalived_script user exists"
+  when: (in_keepalived.vrrp_scripts | default([])) | length > 0
+  ansible.builtin.user:
+    name: keepalived_script
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: "Ensure keepalived config directory exists"
+  ansible.builtin.file:
+    path: "{{ var_keepalived_config_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "Compute unicast peers for instances"
+  no_log: true
+  ansible.builtin.set_fact:
+    _keepalived_unicast_peers: >-
+      {{ _keepalived_unicast_peers | default({}) | combine({inst.name: unicast_peers}) }}
+  vars:
+    unicast: "{{ inst.unicast | default({}) }}"
+    peers_group: "{{ unicast.peers_group | default(in_keepalived.unicast_peers_group | default('')) }}"
+    source_hosts: >-
+      {{
+        (groups[peers_group] | default([]))
+        if (peers_group | length) > 0
+        else (play_hosts | default([]))
+      }}
+    unicast_peers: >-
+      {{
+        (unicast.peers | default([])) if ((unicast.peers | default([])) | length) > 0 else
+        (
+          (source_hosts | difference([inventory_hostname]))
+          | map('extract', hostvars, 'ansible_default_ipv4')
+          | select('defined')
+          | map(attribute='address')
+          | select('defined')
+          | list
+        )
+      }}
+  loop: "{{ in_keepalived.instances | default([]) }}"
+  loop_control:
+    loop_var: inst
+
+- name: "Validate unicast peers for instances"
+  no_log: true
+  ansible.builtin.assert:
+    that:
+      - not (inst.unicast.enabled | default(false) | bool) or (_keepalived_unicast_peers[inst.name] | length) > 0
+    fail_msg: >-
+      keepalived-vip: unicast enabled for {{ inst.name }} but no peers found.
+      Set unicast.peers, unicast.peers_group or in_keepalived.unicast_peers_group,
+      or run the play with at least 2 hosts so auto-discovery from facts can work.
+  loop: "{{ in_keepalived.instances | default([]) }}"
+  loop_control:
+    loop_var: inst
+
+- name: "Render keepalived.conf"
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: "{{ var_keepalived_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: >-
+      {{
+        var_keepalived_validate_cmd
+        if (
+          (in_keepalived.validate_config | default(true) | bool)
+          and (not ansible_check_mode | default(false) | bool)
+        )
+        else omit
+      }}
+  notify: "Restart keepalived"
+
+- name: "Enable and start keepalived (systemd)"
+  when:
+    - ansible_service_mgr | default('') == 'systemd'
+  ansible.builtin.systemd:
+    name: "{{ var_keepalived_service_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: "Skip service management (no systemd)"
+  when:
+    - ansible_service_mgr | default('') != 'systemd'
+  ansible.builtin.debug:
+    msg: "keepalived-vip: keepalived installed/configured, but ansible_service_mgr={{ ansible_service_mgr }} (skip enable/start)"

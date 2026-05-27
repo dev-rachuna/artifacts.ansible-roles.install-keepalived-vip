@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: keepalived_vip
+  namespace: "pl_rachuna_net"
+  author: "Maciej Rachuna"
+  description: "Ansible Role konfiguracją wirtualny adresu IP (VIP)."
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: EL
+      versions:
+        - all
+dependencies: []

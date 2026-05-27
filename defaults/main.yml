@@ -1,0 +1,17 @@
+---
+in_keepalived:
+
+  # Jeśli true, template użyje `keepalived -t -f <config>` do walidacji przed zapisem.
+  validate_config: true
+
+  global_defs:
+    router_id: "{{ inventory_hostname }}"
+
+  # Lista skryptów VRRP (health-check).
+  # Każdy element: name, script, interval (default 2), weight, fall, rise
+  vrrp_scripts: []
+
+  # Lista instancji VRRP.
+  # Każdy element (minimum): name, interface, virtual_router_id, priority, virtual_ipaddresses
+  # Opcjonalne: nopreempt (bool), track_interface (list), track_script (list)
+  instances: []
