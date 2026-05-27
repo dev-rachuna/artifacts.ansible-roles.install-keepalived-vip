@@ -18,10 +18,10 @@ flowchart TD
     ComputePeers --> PeersLogic{Priorytet<br/>rozwiazania peerow}
     PeersLogic -->|1| ExplicitPeers[unicast.peers<br/>jawna lista IP]
     PeersLogic -->|2| GroupPeers[unicast.peers_group<br/>lub in_keepalived.unicast_peers_group]
-    PeersLogic -->|3| PlayHosts[play_hosts<br/>fallback]
+    PeersLogic -->|3| PlayHosts[ansible_play_batch<br/>fallback]
 
     ExplicitPeers --> Validate
-    GroupPeers --> ExtractIP[Extract ansible_default_ipv4<br/>z hostvars, usun self]
+    GroupPeers --> ExtractIP[Extract ansible_facts.default_ipv4<br/>z hostvars, usun self]
     PlayHosts --> ExtractIP
     ExtractIP --> Validate[Validate unicast peers<br/>assert length > 0]
 
@@ -29,7 +29,7 @@ flowchart TD
     Validate -->|ok| Render[Render keepalived.conf<br/>template + validate -t -f]
 
     Render --> Notify[Notify handler<br/>Restart keepalived]
-    Notify --> ServiceMgr{ansible_service_mgr}
+    Notify --> ServiceMgr{ansible_facts.service_mgr}
     ServiceMgr -->|systemd| Systemd[systemd: enable + start<br/>daemon_reload]
     ServiceMgr -->|inne| Skip[Debug: skip enable/start]
     Systemd --> End([Koniec])
@@ -45,7 +45,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    Trigger[Notify: Restart keepalived] --> Listen{ansible_service_mgr}
+    Trigger[Notify: Restart keepalived] --> Listen{ansible_facts.service_mgr}
     Listen -->|systemd| H1[ansible.builtin.systemd<br/>state: restarted]
     Listen -->|inne| H2[ansible.builtin.service<br/>state: restarted]
 ```
@@ -86,8 +86,8 @@ in_keepalived:
         enabled: true
         # Keepalived wymaga IP (hostname nie przejdzie walidacji).
         # Jeśli pominiesz `src_ip`/`peers` (albo ustawisz `peers: []`), template spróbuje
-        # uzupełnić je na podstawie zebranych faktów (`ansible_default_ipv4.address`)
-        # z hostów w bieżącym playu (play_hosts). Możesz wskazać grupę:
+        # uzupełnić je na podstawie zebranych faktów (`ansible_facts.default_ipv4.address`)
+        # z hostów w bieżącym batchu playu (ansible_play_batch). Możesz wskazać grupę:
         #   unicast.peers_group: haproxy
         # lub globalnie:
         #   in_keepalived.unicast_peers_group: haproxy
@@ -97,7 +97,7 @@ in_keepalived:
 ```
 
 Jeśli unicast jest włączony i nie uda się znaleźć żadnych peerów (brak `peers`,
-brak hostów w `play_hosts` / grupie oraz brak faktów), rola przerwie wykonanie
+brak hostów w `ansible_play_batch` / grupie oraz brak faktów), rola przerwie wykonanie
 z czytelnym błędem.
 
 ---
