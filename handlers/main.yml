@@ -1,0 +1,14 @@
+---
+- name: "Restart keepalived (systemd)"
+  ansible.builtin.systemd:
+    name: "{{ var_keepalived_service_name }}"
+    state: restarted
+  listen: "Restart keepalived"
+  when: ansible_service_mgr | default('') == 'systemd'
+
+- name: "Restart keepalived (non-systemd)"
+  ansible.builtin.service:
+    name: "{{ var_keepalived_service_name }}"
+    state: restarted
+  listen: "Restart keepalived"
+  when: ansible_service_mgr | default('') != 'systemd'
